@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Online - Nexus</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Evita rolagem desnecessária no corpo */
+        }
+        /* Barra de rolagem personalizada para a área de mensagens */
+        .message-area::-webkit-scrollbar {
+            width: 8px;
+        }
+        .message-area::-webkit-scrollbar-track {
+            background: #2f3136; /* Fundo mais escuro para a trilha */
+            border-radius: 4px;
+        }
+        .message-area::-webkit-scrollbar-thumb {
+            background: #4f545c; /* Polegar acinzentado */
+            border-radius: 4px;
+        }
+        .message-area::-webkit-scrollbar-thumb:hover {
+            background: #6a6e73;
+        }
+
+        /* Ícone SVG básico para demonstração (se mantiver algum) */
+        .icon {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        .button-style {
+            background-color: #4285F4;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+        }
+        .button-style:hover {
+            background-color: #357ae8;
+        }
+
+        /* Estilos para a lista de "visualizado por" */
+        .read-by-avatars {
+            display: flex;
+            align-items: center;
+            margin-top: 8px;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .read-by-avatar {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            object-fit: cover;
+            /* A cor da borda será definida dinamicamente via JS/Tailwind */
+            border: 1px solid;
+            cursor: help; /* Indica que tem mais informações no hover */
+        }
+        .read-by-text {
+            font-size: 0.75rem; /* text-xs */
+            color: #9CA3AF; /* gray-400 */
+        }
+
+        /* Estilos do indicador de status online/offline */
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 6px;
+            margin-right: 2px;
+        }
+        .status-online {
+            background-color: #4CAF50; /* Verde */
+        }
+        .status-offline {
+            background-color: #EF4444; /* Vermelho (Tailwind red-500) */
+        }
+
+        /* Estilos do Modal de Perfil */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .modal-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background-color: #1a202c; /* gray-900 */
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            max-width: 400px;
+            width: 90%;
+            position: relative;
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+        .modal-overlay.open .modal-content {
+            transform: translateY(0);
+        }
+
+        /* Estilos do GIF Modal */
+        .gif-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 5px; /* Para a barra de rolagem */
+        }
+        .gif-item {
+            cursor: pointer;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .gif-item:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        .gif-item img {
+            width: 100%;
+            height: 100px; /* Altura fixa para visualização */
+            object-fit: cover;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body class="bg-gray-800 text-gray-200 h-screen flex">
+
+    <!-- Área da Esquerda - Perfil do Usuário e Canal Fixo -->
+    <div class="flex-shrink-0 w-60 bg-gray-900 flex flex-col rounded-lg m-2">
+        <!-- Título do Chat -->
+        <div class="p-4 border-b border-gray-700 flex items-center justify-between">
+            <h2 class="text-white font-semibold text-lg">Chat Simples Online</h2>
+        </div>
+
+        <!-- Lista de Canais (Simplificada para um único canal 'geral') -->
+        <div class="flex-grow p-4 overflow-y-auto">
+            <ul id="channels-container">
+                <li class="channel-item flex items-center p-2 rounded-md bg-gray-700 cursor-pointer transition-colors duration-200 active-channel" data-channel-id="general-text-channel" data-type="text" data-name="geral">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <span>geral</span>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Seção de Perfil do Usuário / Login Anônimo -->
+        <div id="user-profile-section" class="p-4 bg-gray-950 flex flex-col items-center justify-center rounded-b-lg">
+            <!-- Conteúdo será carregado dinamicamente via JavaScript -->
+        </div>
+    </div>
+
+    <!-- Área Principal do Conteúdo - Chat -->
+    <div class="flex-grow flex flex-col bg-gray-700 rounded-lg m-2 ml-0">
+        <!-- Cabeçalho do Canal -->
+        <div class="p-4 border-b border-gray-600 flex items-center rounded-t-lg">
+            <h2 id="current-channel-name" class="text-white font-semibold text-lg flex items-center">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                geral
+            </h2>
+        </div>
+
+        <!-- Área de Mensagens do Sistema/Erros -->
+        <div id="system-message-area" class="text-center p-2 hidden rounded-md"></div>
+
+        <!-- Área de Mensagens do Chat -->
+        <div id="message-area" class="flex-grow p-4 overflow-y-auto message-area">
+            <!-- Mensagens serão carregadas aqui -->
+        </div>
+
+        <!-- Campo de Entrada de Mensagens -->
+        <div class="p-4 bg-gray-700 border-t border-gray-600 rounded-b-lg">
+            <div class="flex items-center space-x-2">
+                <button id="add-attachment-button" class="p-2 rounded-full bg-gray-600 hover:bg-gray-500 text-gray-400 hover:text-white transition-colors duration-200">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                </button>
+                <div id="attachment-options" class="hidden flex space-x-2">
+                    <input type="file" id="image-upload-input" accept="image/*" class="hidden">
+                    <button id="upload-image-button" class="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm">Imagem</button>
+                    
+                    <input type="file" id="file-upload-input" class="hidden">
+                    <button id="upload-file-button" class="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm">Arquivo</button>
+                    
+                    <button id="open-gif-modal-button" class="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm">GIF</button>
+                </div>
+                
+                <div class="relative flex-grow">
+                    <input type="text" id="message-input" placeholder="Por favor, digite seu nome e idade para enviar mensagens." class="w-full bg-gray-600 text-gray-200 py-3 px-4 pr-12 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
+                    <button id="send-button" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white" disabled>
+                        <svg class="icon w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Perfil (Pop-up) -->
+    <div id="profile-modal-overlay" class="modal-overlay">
+        <div class="modal-content bg-gray-900 rounded-lg p-6 shadow-xl max-w-sm w-full relative">
+            <button id="profile-modal-close-button" class="absolute top-3 right-3 text-gray-400 hover:text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <div class="flex flex-col items-center">
+                <img id="modal-profile-photo" src="https://placehold.co/80x80/9E9E9E/FFFFFF?text=U" alt="Foto de Perfil" class="rounded-full w-20 h-20 object-cover mb-4 border-4">
+                <h3 id="modal-profile-name" class="text-white font-bold text-xl mb-1"></h3>
+                <p id="modal-profile-age" class="text-gray-400 text-sm mb-2"></p>
+                <p id="modal-profile-status" class="text-gray-400 text-sm mb-4 flex items-center"></p>
+                <!-- Ajuste aqui: Aumenta o tamanho da área de exibição da biografia e adiciona rolagem se necessário -->
+                <div class="w-full bg-gray-700 p-3 rounded-lg text-gray-300 text-sm italic min-h-24 overflow-y-auto">
+                    <p id="modal-profile-bio">Nenhuma biografia fornecida.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de GIF -->
+    <div id="gif-modal-overlay" class="modal-overlay">
+        <div class="modal-content bg-gray-900 rounded-lg p-6 shadow-xl max-w-lg w-full relative">
+            <button id="gif-modal-close-button" class="absolute top-3 right-3 text-gray-400 hover:text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <h3 class="text-white font-bold text-xl mb-4">Buscar GIFs</h3>
+            <div class="flex mb-4">
+                <input type="text" id="gif-search-input" placeholder="Buscar GIFs..." class="w-full p-2 rounded-l-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="gif-search-button" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-r-lg">Buscar</button>
+            </div>
+            <div id="gif-results" class="gif-grid">
+                <!-- GIFs serão carregados aqui -->
+            </div>
+            <p id="gif-loading-message" class="text-center text-gray-400 mt-4 hidden">Carregando GIFs...</p>
+            <p id="gif-error-message" class="text-center text-red-400 mt-4 hidden">Erro ao carregar GIFs.</p>
+        </div>
+    </div>
+
+    <script type="module">
+        // Importa funções necessárias do Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signOut, 
+            onAuthStateChanged,
+            signInWithCustomToken,
+            signInAnonymously
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            query, 
+            orderBy, 
+            onSnapshot, 
+            serverTimestamp,
+            setDoc,
+            doc,
+            getDoc,
+            updateDoc,
+            getDocs,
+            arrayUnion 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // Importa funções do Firebase Storage
+        import { 
+            getStorage, 
+            ref, 
+            uploadBytesResumable, 
+            getDownloadURL 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+        // Variáveis globais (ambiente Canvas ou local)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let firebaseConfig = {}; // Padrão vazio
+
+        // Verifica primeiro a configuração do ambiente Canvas
+        if (typeof __firebase_config !== 'undefined' && __firebase_config !== '{}') {
+            try {
+                firebaseConfig = JSON.parse(__firebase_config);
+                console.log("Configuração do Firebase carregada do ambiente Canvas.");
+            } catch (e) {
+                console.error("Erro ao analisar __firebase_config do ambiente Canvas:", e);
+            }
+        }
+
+        // Se a configuração do Canvas não estiver presente ou falhou, verifica a configuração local fornecida pelo usuário.
+        // IMPORTANTE: Se você estiver executando este arquivo diretamente no seu navegador (fora do ambiente Canvas),
+        // e o ambiente Canvas NÃO fornecer a configuração, você DEVE descomentar o bloco `userProvidedFirebaseConfig` abaixo
+        // e substituir os valores placeholder pela sua configuração real do projeto Firebase.
+        // Você pode encontrar a configuração do seu projeto Firebase no seu Console do Firebase:
+        // Configurações do projeto -> Geral -> Seus apps -> App da web -> Config
+        /*
+        if (Object.keys(firebaseConfig).length === 0 || !firebaseConfig.apiKey) { // Tenta carregar localmente apenas se a config do Canvas estiver faltando
+            const userProvidedFirebaseConfig = {
+                apiKey: "YOUR_API_KEY", // <--- SUBSTITUA ISTO PELA SUA CHAVE DE API REAL
+                authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+                projectId: "YOUR_PROJECT_ID",
+                storageBucket: "YOUR_PROJECT_ID.appspot.com",
+                messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+                appId: "YOUR_FIREBASE_APP_ID" // Este é o ID do app do Firebase, diferente do __app_id do Canvas
+            };
+            // Atribui apenas se o usuário preencheu (ex: se apiKey não é "YOUR_API_KEY")
+            if (userProvidedFirebaseConfig.apiKey !== "YOUR_API_KEY") {
+                firebaseConfig = userProvidedFirebaseConfig;
+                console.log("Configuração do Firebase carregada da configuração local do usuário.");
+            }
+        }
+        */
+
+        // --- Inicializa o Firebase ---
+        let app, auth, db, storage;
+        if (Object.keys(firebaseConfig).length === 0 || !firebaseConfig.apiKey) {
+            console.error("Falha na inicialização do Firebase: Chave de API ausente na configuração. Por favor, verifique as configurações do seu projeto Firebase ou descomente e preencha 'userProvidedFirebaseConfig' se estiver executando localmente.");
+            showSystemMessage("Erro: A configuração do Firebase está faltando ou está incorreta. O aplicativo não funcionará.", 'error');
+            // Define objetos dummy para evitar erros de tempo de execução para métodos Firebase não inicializados.
+            // Isso permite que o aplicativo carregue sem travar, mas os recursos dependentes do Firebase não funcionarão.
+            app = { name: "dummy-app" };
+            auth = {
+                currentUser: null,
+                onAuthStateChanged: (callback) => { console.warn("Autenticação não configurada, onAuthStateChanged dummy."); callback(null); return () => {}; },
+                signInAnonymously: () => { console.error("Firebase Auth não configurado para signInAnonymously."); return Promise.reject(new Error("Firebase Auth não configurado.")); },
+                signOut: () => { console.warn("Autenticação não configurada, signOut dummy."); return Promise.resolve(); }
+            };
+            db = {
+                collection: () => ({
+                    addDoc: () => { console.error("Firestore não configurado para addDoc."); return Promise.reject(new Error("Firestore não configurado.")); },
+                    doc: () => ({
+                        set: () => { console.error("Firestore não configurado para set."); return Promise.reject(new Error("Firestore não configurado.")); },
+                        get: () => { console.warn("Firestore não configurado para get. Retornando doc vazio."); return Promise.resolve({ exists: false, data: () => ({}) }); },
+                        update: () => { console.error("Firestore não configurado para update."); return Promise.reject(new Error("Firestore não configurado.")); }
+                    }),
+                    query: () => ({
+                        orderBy: () => ({
+                            onSnapshot: (successCallback, errorCallback) => {
+                                console.warn("Firestore não configurado para onSnapshot. Retornando snapshot vazio.");
+                                successCallback({ empty: true, forEach: () => {}, docs: [] });
+                                return () => {};
+                            }
+                        })
+                    })
+                }),
+                doc: (collectionRef, docId) => ({
+                    set: (data, options) => { console.error("Firestore não configurado para setDoc (direto)."); return Promise.reject(new Error("Firestore não configurado.")); },
+                    get: () => { console.warn("Firestore não configurado para getDoc (direto). Retornando doc vazio."); return Promise.resolve({ exists: false, data: () => ({}) }); },
+                    update: (data) => { console.error("Firestore não configurado para updateDoc (direto)."); return Promise.reject(new Error("Firestore não configurado.")); }
+                })
+            };
+            storage = { // Dummy storage object
+                ref: () => ({}),
+                uploadBytesResumable: () => { console.error("Firebase Storage não configurado."); return Promise.reject(new Error("Firebase Storage não configurado.")); },
+                getDownloadURL: () => { console.error("Firebase Storage não configurado."); return Promise.reject(new Error("Firebase Storage não configurado.")); }
+            };
+            window.serverTimestamp = () => new Date(); // Retorna data atual para timestamp dummy local
+        } else {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            storage = getStorage(app); // Inicializa Firebase Storage
+            window.serverTimestamp = serverTimestamp; // Torna o serverTimestamp do Firebase disponível globalmente
+        }
+
+        // Garante que window.serverTimestamp esteja sempre definido
+        if (typeof window.serverTimestamp === 'undefined') {
+            window.serverTimestamp = () => new Date();
+        }
+
+        // --- Configuração da API Giphy ---
+        // Você PRECISA obter sua própria chave de API do Giphy em developers.giphy.com
+        const GIPHY_API_KEY = "YOUR_GIPHY_API_KEY"; // <--- SUBSTITUA PELA SUA CHAVE DE API GIPHY REAL
+
+        // Referências de Elementos do DOM
+        const userProfileSection = document.getElementById('user-profile-section');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const messageArea = document.getElementById('message-area');
+        const systemMessageArea = document.getElementById('system-message-area');
+        const currentChannelNameElement = document.getElementById('current-channel-name');
+
+        // Elementos para Anexos
+        const addAttachmentButton = document.getElementById('add-attachment-button');
+        const attachmentOptions = document.getElementById('attachment-options');
+        const imageUploadInput = document.getElementById('image-upload-input');
+        const uploadImageButton = document.getElementById('upload-image-button');
+        const fileUploadInput = document.getElementById('file-upload-input');
+        const uploadFileButton = document.getElementById('upload-file-button');
+        const openGifModalButton = document.getElementById('open-gif-modal-button');
+
+        // Elementos do Modal de Perfil
+        const profileModalOverlay = document.getElementById('profile-modal-overlay');
+        const profileModalCloseButton = document.getElementById('profile-modal-close-button');
+        const modalProfilePhoto = document.getElementById('modal-profile-photo');
+        const modalProfileName = document.getElementById('modal-profile-name');
+        const modalProfileAge = document.getElementById('modal-profile-age');
+        const modalProfileStatus = document.getElementById('modal-profile-status');
+        const modalProfileBio = document.getElementById('modal-profile-bio');
+
+        // Elementos do Modal de GIF
+        const gifModalOverlay = document.getElementById('gif-modal-overlay');
+        const gifModalCloseButton = document.getElementById('gif-modal-close-button');
+        const gifSearchInput = document.getElementById('gif-search-input');
+        const gifSearchButton = document.getElementById('gif-search-button');
+        const gifResults = document.getElementById('gif-results');
+        const gifLoadingMessage = document.getElementById('gif-loading-message');
+        const gifErrorMessage = document.getElementById('gif-error-message');
+
+
+        let currentUser = null;
+        let currentUserId = null;
+        let unsubscribeFromMessages = null;
+        let cachedUsers = {}; // Cache para armazenar perfis de usuários (displayName, photoURL, status, lastOnline, bio)
+        let readMessagesQueue = new Set(); // Fila para IDs de mensagens visualizadas
+
+        // Referências de Coleções do Firestore
+        const usersCollectionRef = collection(db, `artifacts/${appId}/public/data/users`);
+        const generalMessagesCollectionRef = collection(db, `artifacts/${appId}/public/data/channels/general/messages`);
+
+        // --- Funções Auxiliares ---
+
+        /**
+         * Função de debounce para limitar a frequência de chamadas a uma função.
+         * @param {function} func - A função a ser debounced.
+         * @param {number} delay - O atraso em milissegundos.
+         */
+        function debounce(func, delay) {
+            let timeout;
+            return function(...args) {
+                const context = this;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), delay);
+            };
+        }
+
+        /**
+         * Formata um timestamp para exibição de "Última vez online".
+         * @param {firebase.firestore.Timestamp} timestamp - O timestamp do Firestore.
+         * @returns {string} String formatada.
+         */
+        function formatLastOnline(timestamp) {
+            if (!timestamp) return 'Nunca online';
+            const date = timestamp.toDate();
+            const now = new Date();
+            const diffMinutes = Math.round((now.getTime() - date.getTime()) / (1000 * 60));
+
+            if (diffMinutes < 5) { // Considera online se a última atividade foi nos últimos 5 minutos
+                return 'Online';
+            } else if (diffMinutes < 60) {
+                return `Última vez online: ${diffMinutes} min atrás`;
+            } else if (diffMinutes < 24 * 60) {
+                const diffHours = Math.round(diffMinutes / 60);
+                return `Última vez online: ${diffHours} h atrás`;
+            } else {
+                return `Última vez online: ${date.toLocaleDateString('pt-BR')} ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+            }
+        }
+
+        /**
+         * Abre o modal de perfil com os dados do usuário.
+         * @param {string} userId - O ID do usuário cujo perfil será exibido.
+         */
+        function openProfileModal(userId) {
+            const userProfile = cachedUsers[userId];
+            if (!userProfile) {
+                showSystemMessage("Perfil do usuário não encontrado.", 'error');
+                return;
+            }
+
+            modalProfilePhoto.src = userProfile.photoURL || 'https://placehold.co/80x80/9E9E9E/FFFFFF?text=U';
+            modalProfilePhoto.className = `rounded-full w-20 h-20 object-cover mb-4 border-4 ${userProfile.status === 'online' ? 'border-green-500' : 'border-red-500'}`;
+            modalProfileName.textContent = userProfile.displayName || 'Usuário Desconhecido';
+            modalProfileAge.textContent = userProfile.age ? `Idade: ${userProfile.age} anos` : 'Idade não informada';
+            modalProfileBio.textContent = userProfile.biography || 'Nenhuma biografia fornecida.';
+
+            const statusText = userProfile.status === 'online' ? 'Online' : formatLastOnline(userProfile.lastOnline);
+            const statusClass = userProfile.status === 'online' ? 'status-online' : 'status-offline';
+            modalProfileStatus.innerHTML = `
+                <span class="status-indicator ${statusClass}"></span>
+                ${statusText}
+            `;
+
+            profileModalOverlay.classList.add('open');
+        }
+
+        /**
+         * Fecha o modal de perfil.
+         */
+        function closeProfileModal() {
+            profileModalOverlay.classList.remove('open');
+        }
+
+        /**
+         * Abre o modal de GIF.
+         */
+        function openGifModal() {
+            gifModalOverlay.classList.add('open');
+            gifSearchInput.value = ''; // Limpa a busca anterior
+            gifResults.innerHTML = ''; // Limpa os resultados anteriores
+            gifErrorMessage.classList.add('hidden');
+            gifLoadingMessage.classList.add('hidden');
+        }
+
+        /**
+         * Fecha o modal de GIF.
+         */
+        function closeGifModal() {
+            gifModalOverlay.classList.remove('open');
+        }
+
+
+        // --- Funções de Mensagens do Sistema ---
+
+        /**
+         * Exibe uma mensagem no painel de mensagens do sistema.
+         * @param {string} message - A mensagem a ser exibida.
+         * @param {string} type - O tipo de mensagem ('info', 'success', 'error').
+         */
+        function showSystemMessage(message, type = 'info') {
+            systemMessageArea.textContent = message;
+            systemMessageArea.classList.remove('hidden', 'text-red-500', 'text-green-500', 'text-yellow-500');
+            systemMessageArea.classList.add('p-2', 'rounded-md', 'mb-2');
+            if (type === 'error') {
+                systemMessageArea.classList.add('bg-red-900', 'text-red-300');
+            } else if (type === 'success') {
+                systemMessageArea.classList.add('bg-green-900', 'text-green-300');
+            } else {
+                systemMessageArea.classList.add('bg-gray-800', 'text-gray-300');
+            }
+            setTimeout(clearSystemMessage, 5000);
+        }
+
+        /**
+         * Limpa a mensagem do painel de mensagens do sistema.
+         */
+        function clearSystemMessage() {
+            systemMessageArea.classList.add('hidden');
+            systemMessageArea.textContent = '';
+            systemMessageArea.className = 'text-center p-2 hidden rounded-md';
+        }
+
+        // --- Funções de Autenticação e Perfil ---
+
+        /**
+         * Lida com o logout.
+         */
+        async function handleSignOut() {
+            clearSystemMessage();
+            if (currentUser && currentUserId) {
+                try {
+                    // Atualiza o status do usuário para offline no Firestore
+                    const userDocRef = doc(usersCollectionRef, currentUserId);
+                    await updateDoc(userDocRef, {
+                        status: 'offline',
+                        lastOnline: window.serverTimestamp()
+                    });
+                } catch (error) {
+                    console.error("Erro ao atualizar status offline:", error);
+                }
+            }
+
+            try {
+                await signOut(auth);
+                console.log("Logout realizado com sucesso!");
+                showSystemMessage("Logout realizado com sucesso!", 'info');
+                currentUser = null;
+                currentUserId = null;
+                updateUserProfileUI(null);
+                // Não renderiza mensagens se o usuário está deslogado
+            } catch (error) {
+                console.error("Erro no logout:", error);
+                showSystemMessage("Erro ao tentar sair. Por favor, tente novamente.", 'error');
+            }
+        }
+
+        /**
+         * Lida com o login anônimo e a configuração inicial do perfil.
+         */
+        async function handleAnonymousSignInAndProfile() {
+            clearSystemMessage();
+            const displayNameInput = document.getElementById('profile-display-name-input');
+            const ageInput = document.getElementById('profile-age-input');
+            const photoURLInput = document.getElementById('profile-photo-url-input');
+            const biographyInput = document.getElementById('profile-biography-input'); // Novo campo de biografia
+
+            const displayName = displayNameInput.value.trim();
+            const age = parseInt(ageInput.value.trim(), 10);
+            const photoURL = photoURLInput.value.trim();
+            const biography = biographyInput.value.trim(); // Obter valor da biografia
+
+            if (!displayName) {
+                showSystemMessage("Por favor, digite um nome de exibição.", 'error');
+                return;
+            }
+            if (isNaN(age) || age < 18) { // Alterado para verificar idade mínima de 18
+                showSystemMessage("Você deve ter 18 anos ou mais para usar este chat.", 'error');
+                return;
+            }
+            if (!photoURL) { // Photo URL é obrigatória agora para perfil completo
+                showSystemMessage("Por favor, forneça uma URL para sua foto de perfil.", 'error');
+                return;
+            }
+
+            try {
+                let anonUser = auth.currentUser;
+                if (!anonUser || !anonUser.isAnonymous) {
+                    const userCredential = await signInAnonymously(auth);
+                    anonUser = userCredential.user;
+                }
+
+                const userDocRef = doc(usersCollectionRef, anonUser.uid);
+                await setDoc(userDocRef, {
+                    displayName: displayName,
+                    age: age,
+                    photoURL: photoURL, 
+                    biography: biography, // Salvar biografia
+                    status: 'online', // Define como online ao fazer login/configurar
+                    lastOnline: window.serverTimestamp(), // Atualiza o timestamp
+                    createdAt: window.serverTimestamp()
+                }, { merge: true });
+
+                currentUser = { ...anonUser, displayName: displayName, age: age, photoURL: photoURL, biography: biography };
+                showSystemMessage("Login anônimo e perfil configurados com sucesso!", 'success');
+                updateUserProfileUI(currentUser); // Atualiza a UI para mostrar o perfil completo
+                // renderMessagesFromFirestore() será chamado dentro de updateUserProfileUI se o perfil estiver completo
+            } catch (error) {
+                console.error("Erro ao entrar anonimamente e configurar perfil:", error);
+                showSystemMessage(`Erro ao entrar: ${error.message}.`, 'error');
+                // Mantém inputs desabilitados em caso de erro no login
+                messageInput.disabled = true;
+                sendButton.disabled = true;
+                messageInput.placeholder = "Erro ao carregar, por favor tente novamente.";
+            }
+        }
+
+        /**
+         * Salva as atualizações do perfil do usuário.
+         */
+        async function saveUserProfileChanges() {
+            clearSystemMessage();
+            if (!currentUser || !currentUserId) return;
+
+            const displayNameInput = document.getElementById('profile-display-name-input');
+            const ageInput = document.getElementById('profile-age-input');
+            const photoURLInput = document.getElementById('profile-photo-url-input');
+            const biographyInput = document.getElementById('profile-biography-input'); // Novo campo de biografia
+
+            const displayName = displayNameInput.value.trim();
+            const age = parseInt(ageInput.value.trim(), 10);
+            const photoURL = photoURLInput.value.trim();
+            const biography = biographyInput.value.trim(); // Obter valor da biografia
+
+            if (!displayName) {
+                showSystemMessage("O nome de exibição não pode ser vazio.", 'error');
+                return;
+            }
+            if (isNaN(age) || age < 18) { // Alterado para verificar idade mínima de 18
+                showSystemMessage("Você deve ter 18 anos ou mais para usar este chat.", 'error');
+                return;
+            }
+            if (!photoURL) { // Photo URL é obrigatória agora
+                showSystemMessage("Por favor, forneça uma URL para sua foto de perfil.", 'error');
+                return;
+            }
+            // Adicionado validação de limite de caracteres para biografia
+            if (biography.length > 500) {
+                showSystemMessage("A biografia não pode exceder 500 caracteres.", 'error');
+                return;
+            }
+
+
+            try {
+                const userDocRef = doc(usersCollectionRef, currentUserId);
+                await updateDoc(userDocRef, {
+                    displayName: displayName,
+                    age: age,
+                    photoURL: photoURL,
+                    biography: biography, // Atualizar biografia
+                    status: 'online', 
+                    lastOnline: window.serverTimestamp() 
+                });
+                showSystemMessage("Perfil atualizado com sucesso!", 'success');
+                currentUser = { ...currentUser, displayName: displayName, age: age, photoURL: photoURL, biography: biography };
+                updateUserProfileUI(currentUser); // Renderiza o perfil atualizado
+            } catch (error) {
+                console.error("Erro ao salvar perfil:", error);
+                showSystemMessage("Erro ao salvar perfil. Verifique as regras de segurança do Firestore.", 'error');
+            }
+        }
+
+        /**
+         * Atualiza a UI da seção de perfil do usuário com base no status de login e completude do perfil.
+         * @param {Object} user - O objeto de usuário Firebase, ou null se deslogado.
+         */
+        async function updateUserProfileUI(user) {
+            clearSystemMessage();
+            if (user && user.uid) { // Usuário logado
+                currentUser = user;
+                currentUserId = user.uid;
+
+                let userData = null;
+                try {
+                    const userDocRef = doc(usersCollectionRef, currentUserId);
+                    const userDocSnap = await getDoc(userDocRef);
+
+                    if (userDocSnap.exists()) {
+                        userData = userDocSnap.data();
+                        currentUser = { ...currentUser, ...userData }; // Mescla dados do Firestore com o objeto user
+                    } else {
+                        // Para um novo usuário anônimo (primeira vez), criar o documento com dados padrão
+                        userData = {
+                            displayName: '',
+                            age: 0,
+                            photoURL: '',
+                            biography: '', // Inicializa biografia
+                            status: 'offline', 
+                            lastOnline: null,
+                            createdAt: window.serverTimestamp()
+                        };
+                        await setDoc(userDocRef, userData); // setDoc cria se não existe
+                        currentUser = { ...currentUser, ...userData }; // Atualiza currentUser com os dados padrão
+                    }
+
+                    // --- Fetch e cache de TODOS os usuários para o recurso "visualizado por" e status online ---
+                    // Isso é feito SEMPRE que a UI do perfil é atualizada para manter o cache fresco
+                    const allUsersSnapshot = await getDocs(usersCollectionRef);
+                    cachedUsers = {}; // Limpa o cache anterior
+                    allUsersSnapshot.forEach(docSnap => {
+                        cachedUsers[docSnap.id] = docSnap.data();
+                    });
+                    console.log("Perfis de usuários em cache carregados:", cachedUsers);
+
+                } catch (error) {
+                    console.error("Erro ao buscar dados do usuário/cache de perfis:", error);
+                    showSystemMessage("Erro ao carregar seu perfil ou perfis de outros usuários. Verifique as regras de segurança do Firestore para 'users'.", 'error');
+                    currentUser = null;
+                }
+
+                // Verifica se o perfil precisa ser completado (nome, idade >= 18 e fotoURL)
+                const isProfileComplete = currentUser && currentUser.displayName && currentUser.displayName.trim() !== '' && currentUser.age >= 18 && currentUser.photoURL && currentUser.photoURL.trim() !== ''; 
+
+                if (!isProfileComplete) { // Perfil incompleto ou menor de 18
+                    userProfileSection.innerHTML = `
+                        <div class="flex-shrink-0 flex items-center mb-2 cursor-pointer" id="my-profile-pic-container">
+                            <img src="${currentUser.photoURL || 'https://placehold.co/40x40/9E9E9E/FFFFFF?text=?'}" alt="User Avatar" class="rounded-full w-10 h-10 object-cover border-2 border-gray-500">
+                            <div class="ml-3 flex-grow">
+                                <p class="text-white font-semibold">Complete seu perfil</p>
+                                <p class="text-xs text-gray-400">ID: ${currentUserId.substring(0, 8)}...</p>
+                            </div>
+                        </div>
+                        <div class="w-full mb-2">
+                            <label for="profile-display-name-input" class="block text-sm font-medium text-gray-300 mb-1">Nome de Exibição:</label>
+                            <input type="text" id="profile-display-name-input" placeholder="Seu Nome" class="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2" value="${currentUser.displayName || ''}">
+                            <label for="profile-age-input" class="block text-sm font-medium text-gray-300 mb-1">Idade:</label>
+                            <input type="number" id="profile-age-input" placeholder="Sua Idade" class="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2" value="${currentUser.age || ''}">
+                            <label for="profile-photo-url-input" class="block text-sm font-medium text-gray-300 mb-1">URL da Foto:</label>
+                            <input type="text" id="profile-photo-url-input" placeholder="URL da Foto (obrigatório)" class="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2" value="${currentUser.photoURL && currentUser.photoURL !== 'https://placehold.co/40x40/9E9E9E/FFFFFF?text=U' ? currentUser.photoURL : ''}">
+                            <label for="profile-biography-input" class="block text-sm font-medium text-gray-300 mb-1">Biografia (opcional):</label>
+                            <textarea id="profile-biography-input" placeholder="Conte-nos sobre você" class="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2" maxlength="500">${currentUser.biography || ''}</textarea>
+                            <p class="text-xs text-gray-400 mb-2">Para usar uma imagem de perfil, insira uma URL válida (ex: de Imgur, Flickr, etc.).</p>
+                            <button id="save-profile-button" class="button-style w-full bg-blue-600 hover:bg-blue-700">Salvar Perfil</button>
+                        </div>
+                        <button id="sign-out-button-profile" class="button-style w-full mt-2 bg-red-600 hover:bg-red-700">Sair</button>
+                    `;
+                    document.getElementById('save-profile-button').addEventListener('click', handleAnonymousSignInAndProfile);
+                    // Adicionar listener ao clicar na foto de perfil para abrir o modal
+                    document.getElementById('my-profile-pic-container').addEventListener('click', () => openProfileModal(currentUserId));
+                    // Restringe o acesso ao chat
+                    messageInput.disabled = true;
+                    sendButton.disabled = true;
+                    messageInput.placeholder = "Complete seu perfil para conversar.";
+                    attachmentOptions.classList.add('hidden'); // Oculta opções de anexo
+                    addAttachmentButton.classList.add('hidden'); // Oculta botão de anexo
+                    messageArea.innerHTML = `<div class="text-center text-gray-400 p-4">
+                        Por favor, complete seu perfil (nome, idade e foto) para ver e enviar mensagens.
+                    </div>`;
+
+                } else { // Perfil completo, exibe informações e habilita chat
+                    userProfileSection.innerHTML = `
+                        <div class="flex-shrink-0 flex items-center mb-2 cursor-pointer" id="my-profile-pic-container">
+                            <img src="${currentUser.photoURL || 'https://placehold.co/40x40/4CAF50/FFFFFF?text=?'}" alt="User Avatar" class="rounded-full w-10 h-10 object-cover border-2 ${currentUser.status === 'online' ? 'border-green-500' : 'border-red-500'}">
+                            <div class="ml-3 flex-grow">
+                                <p class="text-white font-semibold">${currentUser.displayName}</p>
+                                <p class="text-xs text-gray-400">Idade: ${currentUser.age}</p>
+                                <p class="text-xs text-gray-400">ID: ${currentUserId.substring(0, 8)}...</p>
+                                <p class="text-xs text-gray-400">
+                                    <span class="status-indicator ${currentUser.status === 'online' ? 'status-online' : 'status-offline'}"></span>
+                                    ${currentUser.status === 'online' ? 'Online' : formatLastOnline(currentUser.lastOnline)}
+                                </p>
+                            </div>
+                        </div>
+                        <button id="edit-profile-button" class="button-style w-full mt-2 bg-yellow-600 hover:bg-yellow-700">Editar Perfil</button>
+                        <button id="sign-out-button-profile" class="button-style w-full mt-2 bg-red-600 hover:bg-red-700">Sair</button>
+                    `;
+                    document.getElementById('edit-profile-button').addEventListener('click', () => {
+                        // Ao clicar em editar, renderiza os campos de input com os valores atuais
+                        userProfileSection.innerHTML = `
+                            <div class="flex-shrink-0 flex items-center mb-2 cursor-pointer" id="my-profile-pic-container">
+                                <img src="${currentUser.photoURL || 'https://placehold.co/40x40/9E9E9E/FFFFFF?text=?'}" alt="User Avatar" class="rounded-full w-10 h-10 object-cover border-2 ${currentUser.status === 'online' ? 'border-green-500' : 'border-red-500'}">
+                                <div class="ml-3 flex-grow">
+                                    <p class="text-white font-semibold">Editar seu perfil</p>
+                                    <p class="text-xs text-gray-400">ID: ${currentUserId.substring(0, 8)}...</p>
+                                </div>
+                            </div>
+                            <div class="w-full mb-2">
+                                <label for="profile-display-name-input" class="block text-sm font-medium text-gray-300 mb-1">Nome de Exibição:</label>
+                                <input type="text" id="profile-display-name-input" class="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2" value="${currentUser.displayName || ''}">
+                                <label for="profile-age-input" class="block text-sm font-medium text-gray-300 mb-1">Idade:</label>
+                                <input type="number" id="profile-age-input" class="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2" value="${currentUser.age || ''}">
+                                <label for="profile-photo-url-input" class="block text-sm font-medium text-gray-300 mb-1">URL da Foto:</label>
+                                <input type="text" id="profile-photo-url-input" placeholder="URL da Foto (obrigatório)" class="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2" value="${currentUser.photoURL && currentUser.photoURL !== 'https://placehold.co/40x40/9E9E9E/FFFFFF?text=U' ? currentUser.photoURL : ''}">
+                                <label for="profile-biography-input" class="block text-sm font-medium text-gray-300 mb-1">Biografia (opcional):</label>
+                                <textarea id="profile-biography-input" placeholder="Conte-nos sobre você" class="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2" maxlength="500">${currentUser.biography || ''}</textarea>
+                                <p class="text-xs text-gray-400 mb-2">Para usar uma imagem de perfil, insira uma URL válida (ex: de Imgur, Flickr, etc.).</p>
+                                <button id="save-changes-button" class="button-style w-full bg-blue-600 hover:bg-blue-700">Salvar Alterações</button>
+                                <button id="cancel-edit-button" class="button-style w-full mt-2 bg-gray-600 hover:bg-gray-700">Cancelar</button>
+                            </div>
+                            <button id="sign-out-button-profile" class="button-style w-full mt-2 bg-red-600 hover:bg-red-700">Sair</button>
+                        `;
+                        document.getElementById('save-changes-button').addEventListener('click', saveUserProfileChanges);
+                        document.getElementById('cancel-edit-button').addEventListener('click', () => updateUserProfileUI(currentUser)); // Retorna para visualização
+                        document.getElementById('sign-out-button-profile').addEventListener('click', handleSignOut);
+                        // Adicionar listener ao clicar na foto de perfil para abrir o modal
+                        document.getElementById('my-profile-pic-container').addEventListener('click', () => openProfileModal(currentUserId));
+                    });
+                    // Habilita acesso ao chat
+                    messageInput.disabled = false;
+                    sendButton.disabled = false;
+                    messageInput.placeholder = "Digite sua mensagem...";
+                    attachmentOptions.classList.remove('hidden'); // Exibe opções de anexo
+                    addAttachmentButton.classList.remove('hidden'); // Exibe botão de anexo
+                    renderMessagesFromFirestore(); // Renderiza as mensagens quando o perfil está completo
+                }
+
+                // Adiciona ou readiciona o listener do botão de sair
+                const signOutButton = document.getElementById('sign-out-button-profile');
+                if (signOutButton) {
+                    signOutButton.removeEventListener('click', handleSignOut);
+                    signOutButton.addEventListener('click', handleSignOut);
+                }
+
+            } else { // Usuário deslogado ou sem perfil
+                userProfileSection.innerHTML = `
+                    <div class="w-full mb-2">
+                        <label for="profile-display-name-input" class="block text-sm font-medium text-gray-300 mb-1">Nome de Exibição:</label>
+                        <input type="text" id="profile-display-name-input" placeholder="Seu Nome" class="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2">
+                        <label for="profile-age-input" class="block text-sm font-medium text-gray-300 mb-1">Idade:</label>
+                        <input type="number" id="profile-age-input" placeholder="Sua Idade" class="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2">
+                        <label for="profile-photo-url-input" class="block text-sm font-medium text-gray-300 mb-1">URL da Foto:</label>
+                        <input type="text" id="profile-photo-url-input" placeholder="URL da Foto (obrigatório)" class="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2">
+                        <label for="profile-biography-input" class="block text-sm font-medium text-gray-300 mb-1">Biografia (opcional):</label>
+                        <textarea id="profile-biography-input" placeholder="Conte-nos sobre você" class="w-full p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2" maxlength="500"></textarea>
+                        <p class="text-xs text-gray-400 mb-2">Para usar uma imagem de perfil, insira uma URL válida (ex: de Imgur, Flickr, etc.).</p>
+                        <button id="anon-sign-in-button" class="button-style w-full bg-blue-600 hover:bg-blue-700">Entrar no Chat</button>
+                    </div>
+                `;
+                document.getElementById('anon-sign-in-button').addEventListener('click', handleAnonymousSignInAndProfile);
+                // Restringe o acesso ao chat
+                messageInput.disabled = true;
+                sendButton.disabled = true;
+                messageInput.placeholder = "Por favor, digite seu nome e idade para enviar mensagens.";
+                attachmentOptions.classList.add('hidden'); // Oculta opções de anexo
+                addAttachmentButton.classList.add('hidden'); // Oculta botão de anexo
+                messageArea.innerHTML = `<div class="text-center text-gray-400 p-4">
+                    Para ver e enviar mensagens, por favor, digite seu nome e idade e clique em 'Entrar no Chat'.
+                </div>`;
+            }
+        }
+
+        // --- Funções de Mensagens do Chat ---
+
+        /**
+         * Lida com a atualização do estado de visualização de mensagens ao rolar.
+         * Identifica mensagens visíveis e as adiciona à fila para serem marcadas como lidas.
+         */
+        const handleScrollReadReceipts = debounce(() => {
+            if (!currentUser || !currentUserId) return; // Só rastreia se houver usuário logado
+
+            // Verifica se o perfil está completo antes de rastrear visualizações
+            const isProfileComplete = currentUser.displayName && currentUser.displayName.trim() !== '' && currentUser.age >= 18 && currentUser.photoURL && currentUser.photoURL.trim() !== '';
+            if (!isProfileComplete) {
+                console.log("Perfil incompleto. Pulando rastreamento de visualizações.");
+                return;
+            }
+
+            const messages = messageArea.querySelectorAll('.message');
+            messages.forEach(messageElement => {
+                const rect = messageElement.getBoundingClientRect();
+                const messageId = messageElement.dataset.messageId; // Obter o ID da mensagem
+
+                // Se a mensagem está visível (pelo menos 50% dela)
+                const isVisible = (rect.top >= 0 && rect.bottom <= window.innerHeight) ||
+                                  (rect.top < window.innerHeight && rect.bottom >= 0 && rect.height > 0 &&
+                                  (rect.top + rect.height * 0.5 < window.innerHeight && rect.bottom - rect.height * 0.5 > 0));
+
+                if (isVisible && messageId) {
+                    if (!readMessagesQueue.has(messageId)) {
+                        readMessagesQueue.add(messageId);
+                        // console.log(`Mensagem ${messageId} adicionada à fila de leitura.`); // Reduzir logs
+                    }
+                }
+            });
+            processReadMessagesQueue();
+        }, 500); // Debounce de 500ms
+
+        /**
+         * Processa a fila de mensagens visualizadas e as marca como lidas no Firestore.
+         */
+        async function processReadMessagesQueue() {
+            if (readMessagesQueue.size === 0 || !currentUser || !currentUserId) return;
+
+            // Verifica novamente se o perfil está completo antes de tentar escrever no Firestore
+            const isProfileComplete = currentUser.displayName && currentUser.displayName.trim() !== '' && currentUser.age >= 18 && currentUser.photoURL && currentUser.photoURL.trim() !== '';
+            if (!isProfileComplete) {
+                console.warn("Tentativa de processar fila de leitura com perfil incompleto. Abortando.");
+                readMessagesQueue.clear(); // Limpa a fila para não tentar novamente
+                return;
+            }
+
+            const messagesToUpdate = Array.from(readMessagesQueue);
+            readMessagesQueue.clear(); 
+
+            // console.log(`Processando ${messagesToUpdate.length} mensagens para marcar como lidas.`); // Reduzir logs
+
+            for (const messageId of messagesToUpdate) {
+                try {
+                    const messageDocRef = doc(generalMessagesCollectionRef, messageId);
+                    await updateDoc(messageDocRef, {
+                        readBy: arrayUnion(currentUserId)
+                    });
+                    // console.log(`Mensagem ${messageId} marcada como lida por ${currentUserId}.`); // Reduzir logs
+                } catch (error) {
+                    console.error(`Erro ao marcar mensagem ${messageId} como lida:`, error);
+                }
+            }
+        }
+
+        /**
+         * Renderiza as mensagens do canal "geral" do Firestore.
+         */
+        function renderMessagesFromFirestore() {
+            clearSystemMessage();
+            // Verifica se o perfil está completo antes de renderizar as mensagens
+            const isProfileComplete = currentUser && currentUser.displayName && currentUser.displayName.trim() !== '' && currentUser.age >= 18 && currentUser.photoURL && currentUser.photoURL.trim() !== '';
+
+            if (!isProfileComplete) {
+                if (unsubscribeFromMessages) {
+                    unsubscribeFromMessages(); // Garante que não há listener ativo
+                }
+                messageInput.disabled = true;
+                sendButton.disabled = true;
+                messageInput.placeholder = "Complete seu perfil para conversar.";
+                attachmentOptions.classList.add('hidden');
+                addAttachmentButton.classList.add('hidden');
+                messageArea.innerHTML = `<div class="text-center text-gray-400 p-4">
+                    Por favor, complete seu perfil (nome, idade e foto) para ver e enviar mensagens.
+                </div>`;
+                return; // Sai da função se o perfil não estiver completo
+            }
+
+            if (unsubscribeFromMessages) {
+                unsubscribeFromMessages();
+            }
+            messageArea.innerHTML = '<div class="text-center text-gray-400 p-4">Carregando mensagens...</div>';
+
+            const q = query(generalMessagesCollectionRef, orderBy('timestamp', 'asc'));
+
+            unsubscribeFromMessages = onSnapshot(q, (snapshot) => {
+                messageArea.innerHTML = '';
+                if (snapshot.empty) {
+                    messageArea.innerHTML = `<div class="text-center text-gray-400 p-4">Nenhuma mensagem neste chat. Seja o primeiro a enviar!</div>`;
+                    return;
+                }
+
+                snapshot.forEach(docSnap => {
+                    const msg = docSnap.data();
+                    const messageId = docSnap.id; // Obter o ID do documento
+                    const messageElement = document.createElement('div');
+                    messageElement.classList.add('message', 'mb-4', 'flex');
+                    messageElement.dataset.messageId = messageId; // Armazenar o ID da mensagem no elemento HTML
+
+                    // Construir a lista de avatares "visualizado por"
+                    let readByAvatarsHtml = '';
+                    if (msg.readBy && Array.isArray(msg.readBy) && msg.readBy.length > 0) {
+                        const uniqueReaders = new Set(msg.readBy); // Garante que não há duplicatas de ID na exibição
+                        const readersToDisplay = Array.from(uniqueReaders).filter(readerId => readerId !== msg.userId); // Exclui o remetente
+
+                        if (readersToDisplay.length > 0) {
+                            readByAvatarsHtml = `
+                                <div class="read-by-avatars">
+                                    <span class="read-by-text mr-1">Visualizado por:</span>
+                                    ${readersToDisplay.map(readerId => {
+                                        const readerProfile = cachedUsers[readerId];
+                                        // Aplica a classe de borda com base no status do leitor
+                                        const borderColorClass = readerProfile && readerProfile.status === 'online' ? 'border-green-500' : 'border-red-500';
+                                        return readerProfile ? `
+                                            <img src="${readerProfile.photoURL || 'https://placehold.co/20x20/9E9E9E/FFFFFF?text=?'}" 
+                                                 alt="${readerProfile.displayName || 'Usuário'}" 
+                                                 title="${readerProfile.displayName || 'Usuário Desconhecido'}" 
+                                                 class="read-by-avatar border-2 ${borderColorClass}" data-user-id="${readerId}">
+                                        ` : '';
+                                    }).join('')}
+                                </div>
+                            `;
+                        }
+                    }
+
+                    // Obter informações do remetente da mensagem do cache
+                    const senderProfile = cachedUsers[msg.userId] || { displayName: 'Usuário Desconhecimento', photoURL: 'https://placehold.co/40x40/9E9E9E/FFFFFF?text=U', age: '?', status: 'offline', biography: '' };
+                    // Aplica a classe de borda com base no status do remetente
+                    const senderBorderColorClass = senderProfile.status === 'online' ? 'border-green-500' : 'border-red-500';
+
+                    let messageContentHtml = `<p class="text-gray-300">${msg.text || ''}</p>`;
+                    if (msg.type === 'image' && msg.fileUrl) {
+                        messageContentHtml = `<img src="${msg.fileUrl}" alt="Imagem" class="max-w-xs md:max-w-md lg:max-w-lg rounded-lg object-contain mt-2 cursor-pointer" onclick="window.open(this.src)">`;
+                    } else if (msg.type === 'file' && msg.fileUrl && msg.fileName) {
+                        messageContentHtml = `<a href="${msg.fileUrl}" target="_blank" class="text-blue-400 hover:underline flex items-center mt-2">
+                                <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13.5"></path></svg>
+                                ${msg.fileName}
+                            </a>`;
+                    } else if (msg.type === 'gif' && msg.gifUrl) {
+                        messageContentHtml = `<img src="${msg.gifUrl}" alt="GIF" class="max-w-xs md:max-w-md lg:max-w-lg rounded-lg object-contain mt-2 cursor-pointer" onclick="window.open(this.src)">`;
+                    }
+
+
+                    messageElement.innerHTML = `
+                        <div class="flex-shrink-0 mr-4">
+                            <img src="${senderProfile.photoURL}" alt="User Avatar" class="rounded-full w-10 h-10 object-cover border-2 ${senderBorderColorClass} cursor-pointer" data-user-id="${msg.userId}">
+                        </div>
+                        <div>
+                            <div class="font-semibold text-white">
+                                ${senderProfile.displayName} <span class="text-xs text-gray-400 ml-2">${senderProfile.age ? `(${senderProfile.age} anos)` : ''}</span>
+                                <span class="text-xs text-gray-400 ml-2">${msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleString('pt-BR') : 'Agora'}</span>
+                            </div>
+                            ${messageContentHtml}
+                            ${readByAvatarsHtml} <!-- Adicionar os avatares de visualização aqui -->
+                        </div>
+                    `;
+                    messageArea.appendChild(messageElement);
+                });
+                messageArea.scrollTop = messageArea.scrollHeight;
+
+                // Adiciona listeners de clique às fotos de perfil para abrir o modal
+                messageArea.querySelectorAll('.message img[data-user-id]').forEach(img => {
+                    img.addEventListener('click', (event) => {
+                        event.stopPropagation(); // Evita que o evento de rolagem seja acionado
+                        openProfileModal(event.target.dataset.userId);
+                    });
+                });
+                messageArea.querySelectorAll('.read-by-avatar[data-user-id]').forEach(img => {
+                    img.addEventListener('click', (event) => {
+                        event.stopPropagation(); // Evita que o evento de rolagem seja acionado
+                        openProfileModal(event.target.dataset.userId);
+                    });
+                });
+
+                // Após a renderização inicial ou atualização, verifica as mensagens visíveis
+                handleScrollReadReceipts();
+            }, (error) => {
+                console.error("Erro ao carregar mensagens do Firestore:", error);
+                showSystemMessage("Erro ao carregar mensagens. Verifique as regras de segurança do Firestore para as mensagens.", 'error');
+            });
+        }
+
+        /**
+         * Envia uma mensagem para o Firestore.
+         */
+        async function sendMessage(type = 'text', content = null, fileName = null) {
+            clearSystemMessage();
+            const text = messageInput.value.trim();
+
+            // Verifica se o perfil está completo antes de permitir o envio
+            const isProfileComplete = currentUser && currentUser.displayName && currentUser.displayName.trim() !== '' && currentUser.age >= 18 && currentUser.photoURL && currentUser.photoURL.trim() !== '';
+            if (!isProfileComplete) {
+                console.warn("Não foi possível enviar a mensagem: perfil incompleto.");
+                showSystemMessage("Não foi possível enviar a mensagem. Por favor, complete seu perfil.", 'error');
+                return;
+            }
+
+            // Se for mensagem de texto, precisa ter texto
+            if (type === 'text' && text === '') {
+                showSystemMessage("Por favor, digite sua mensagem ou selecione um anexo.", 'error');
+                return;
+            }
+            // Se for anexo, precisa ter o content
+            if (type !== 'text' && !content) {
+                showSystemMessage("Nenhum arquivo ou GIF selecionado.", 'error');
+                return;
+            }
+
+            try {
+                const messageData = {
+                    user: currentUser.displayName, 
+                    userId: currentUserId,
+                    age: currentUser.age,
+                    avatar: currentUser.photoURL,
+                    timestamp: window.serverTimestamp(),
+                    readBy: [currentUserId] 
+                };
+
+                if (type === 'text') {
+                    messageData.type = 'text';
+                    messageData.text = text;
+                } else if (type === 'image') {
+                    messageData.type = 'image';
+                    messageData.fileUrl = content;
+                    messageData.fileName = fileName; // Para referência futura, se necessário
+                } else if (type === 'file') {
+                    messageData.type = 'file';
+                    messageData.fileUrl = content;
+                    messageData.fileName = fileName;
+                } else if (type === 'gif') {
+                    messageData.type = 'gif';
+                    messageData.gifUrl = content;
+                    messageData.text = `[GIF] ${fileName || ''}`; // Adiciona um texto descritivo para o GIF
+                }
+
+                await addDoc(generalMessagesCollectionRef, messageData);
+                messageInput.value = ''; // Limpa o input após enviar a mensagem
+                if (attachmentOptions.classList.contains('flex')) { // Esconde opções se estiverem abertas
+                    attachmentOptions.classList.add('hidden');
+                    attachmentOptions.classList.remove('flex');
+                }
+                closeGifModal(); // Garante que o modal de GIF seja fechado após o envio
+            } catch (error) {
+                console.error("Erro ao enviar mensagem para o Firestore:", error);
+                showSystemMessage("Erro ao enviar mensagem. Verifique as regras de segurança do Firestore e Storage.", 'error');
+            }
+        }
+
+        /**
+         * Lida com o upload de arquivos para o Firebase Storage.
+         * @param {File} file - O arquivo a ser carregado.
+         * @param {string} type - O tipo de arquivo ('image' ou 'file').
+         */
+        async function uploadFileToStorage(file, type) {
+            if (!file) {
+                showSystemMessage("Nenhum arquivo selecionado para upload.", 'error');
+                return null;
+            }
+
+            const fileName = `${Date.now()}_${file.name}`;
+            const storageRef = ref(storage, `chat_attachments/${fileName}`);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            showSystemMessage(`Enviando ${file.name}...`, 'info');
+
+            return new Promise((resolve, reject) => {
+                uploadTask.on('state_changed', 
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        console.log('Upload is ' + progress + '% done');
+                        showSystemMessage(`Upload ${file.name}: ${progress.toFixed(0)}%`, 'info');
+                    }, 
+                    (error) => {
+                        console.error("Erro no upload do arquivo:", error);
+                        showSystemMessage(`Falha no upload de ${file.name}.`, 'error');
+                        reject(error);
+                    }, 
+                    async () => {
+                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                        console.log('Arquivo disponível em:', downloadURL);
+                        showSystemMessage(`${file.name} enviado com sucesso!`, 'success');
+                        resolve(downloadURL);
+                    }
+                );
+            });
+        }
+
+        /**
+         * Busca GIFs na API do Giphy.
+         * @param {string} query - O termo de busca para GIFs.
+         */
+        async function searchGifs(query) {
+            gifResults.innerHTML = '';
+            gifLoadingMessage.classList.remove('hidden');
+            gifErrorMessage.classList.add('hidden');
+
+            if (!GIPHY_API_KEY || GIPHY_API_KEY === "YOUR_GIPHY_API_KEY") {
+                gifErrorMessage.textContent = "Erro: Chave da API Giphy não configurada. Por favor, adicione sua chave de API Giphy.";
+                gifErrorMessage.classList.remove('hidden');
+                gifLoadingMessage.classList.add('hidden');
+                return;
+            }
+
+            const url = `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=25&offset=0&rating=g&lang=en`;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`Erro na API Giphy: ${response.statusText}`);
+                }
+                const data = await response.json();
+                
+                gifLoadingMessage.classList.add('hidden');
+
+                if (data.data.length === 0) {
+                    gifResults.innerHTML = '<p class="text-gray-400">Nenhum GIF encontrado para sua busca.</p>';
+                } else {
+                    data.data.forEach(gif => {
+                        const img = document.createElement('img');
+                        img.src = gif.images.fixed_height_small.url; // Uma versão pequena e rápida
+                        img.alt = gif.title;
+                        img.classList.add('gif-item', 'rounded-lg', 'cursor-pointer');
+                        img.title = gif.title; // Título no hover
+
+                        img.addEventListener('click', () => {
+                            sendMessage('gif', gif.images.original.url, gif.title); // Envia o URL original
+                        });
+                        gifResults.appendChild(img);
+                    });
+                }
+
+            } catch (error) {
+                console.error("Erro ao buscar GIFs:", error);
+                gifLoadingMessage.classList.add('hidden');
+                gifErrorMessage.textContent = `Erro ao buscar GIFs: ${error.message}`;
+                gifErrorMessage.classList.remove('hidden');
+            }
+        }
+
+        // --- Inicialização e Listeners Globais ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Define o canal 'geral' como o canal ativo padrão
+            currentChannelNameElement.innerHTML = `
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                geral
+            `;
+
+            let initialAuthResolved = false;
+
+            // Listener de estado de autenticação do Firebase
+            const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+                if (!initialAuthResolved) {
+                    initialAuthResolved = true;
+                    if (initialAuthToken) {
+                        try {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                            console.log("Autenticação customizada do Canvas bem-sucedida.");
+                        } catch (error) {
+                            console.error("Erro na autenticação customizada do Canvas:", error);
+                            try {
+                                await signInAnonymously(auth);
+                                console.log("Login anônimo bem-sucedido (fallback).");
+                            } catch (anonError) {
+                                console.error("Erro no login anônimo:", anonError);
+                                showSystemMessage("Erro grave: Não foi possível autenticar o usuário. O aplicativo pode não funcionar corretamente.", 'error');
+                            }
+                        }
+                    } else {
+                        try {
+                            await signInAnonymously(auth);
+                            console.log("Login anônimo bem-sucedido.");
+                        } catch (anonError) {
+                            console.error("Erro no login anônimo:", anonError);
+                            showSystemMessage("Erro grave: Não foi possível autenticar o usuário. O aplicativo pode não funcionar corretamente.", 'error');
+                        }
+                    }
+                    // Após a tentativa de login, atualiza a UI com o usuário atual (pode ser null se falhou)
+                    await updateUserProfileUI(auth.currentUser); 
+                    
+                    // Adicionar listener de rolagem para o recurso "visualizado por" APENAS se o usuário estiver logado e perfil completo
+                    const isProfileCompleteAfterAuth = currentUser && currentUser.displayName && currentUser.displayName.trim() !== '' && currentUser.age >= 18 && currentUser.photoURL && currentUser.photoURL.trim() !== '';
+                    if (auth.currentUser && isProfileCompleteAfterAuth) {
+                         messageArea.addEventListener('scroll', handleScrollReadReceipts);
+                         window.addEventListener('beforeunload', async () => {
+                            if (currentUser && currentUserId) {
+                                try {
+                                    const userDocRef = doc(usersCollectionRef, currentUserId);
+                                    await updateDoc(userDocRef, {
+                                        status: 'offline',
+                                        lastOnline: window.serverTimestamp()
+                                    });
+                                    console.log("Status offline atualizado ao fechar a página.");
+                                } catch (error) {
+                                    console.error("Erro ao atualizar status offline em beforeunload:", error);
+                                }
+                            }
+                        });
+                    }
+                    unsubscribeAuth(); 
+                }
+            });
+        });
+
+        // --- Listeners de Eventos ---
+
+        // Listener do botão de enviar mensagem
+        sendButton.addEventListener('click', () => sendMessage('text')); // Envia mensagem de texto por padrão
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage('text'); // Envia mensagem de texto ao pressionar Enter
+            }
+        });
+
+        // Listeners para Modal de Perfil
+        profileModalCloseButton.addEventListener('click', closeProfileModal);
+        profileModalOverlay.addEventListener('click', (event) => {
+            if (event.target === profileModalOverlay) { // Fecha apenas se clicar no overlay
+                closeProfileModal();
+            }
+        });
+
+        // Listeners para Anexos e GIFs
+        addAttachmentButton.addEventListener('click', () => {
+            attachmentOptions.classList.toggle('hidden');
+            if (attachmentOptions.classList.contains('hidden')) {
+                attachmentOptions.classList.remove('flex'); // Remove flex se escondido
+            } else {
+                attachmentOptions.classList.add('flex'); // Adiciona flex se visível
+            }
+        });
+
+        uploadImageButton.addEventListener('click', () => imageUploadInput.click());
+        imageUploadInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const downloadURL = await uploadFileToStorage(file, 'image');
+                if (downloadURL) {
+                    sendMessage('image', downloadURL, file.name);
+                }
+            }
+            imageUploadInput.value = ''; // Limpa o input para permitir upload do mesmo arquivo novamente
+        });
+
+        uploadFileButton.addEventListener('click', () => fileUploadInput.click());
+        fileUploadInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const downloadURL = await uploadFileToStorage(file, 'file');
+                if (downloadURL) {
+                    sendMessage('file', downloadURL, file.name);
+                }
+            }
+            fileUploadInput.value = ''; // Limpa o input
+        });
+
+        openGifModalButton.addEventListener('click', openGifModal);
+        gifModalCloseButton.addEventListener('click', closeGifModal);
+        gifModalOverlay.addEventListener('click', (event) => {
+            if (event.target === gifModalOverlay) {
+                closeGifModal();
+            }
+        });
+        gifSearchButton.addEventListener('click', () => searchGifs(gifSearchInput.value));
+        gifSearchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchGifs(gifSearchInput.value);
+            }
+        });
+
+    </script>
+</body>
+</html>
